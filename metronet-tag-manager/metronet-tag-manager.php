@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name: Metronet Tag Manager
+Plugin Name: RPG VERSION :: Metronet Tag Manager
 Plugin URI: http://wordpress.org/extend/plugins/metronet-tag-manager/
-Description: Add Google Tag Manager tracking and declare Data Layer variables
+Description: RPG VERSION :: Add Google Tag Manager tracking and declare Data Layer variables
 Author: Ronald Huereca
 Version: 1.2.7
 Requires at least: 4.2

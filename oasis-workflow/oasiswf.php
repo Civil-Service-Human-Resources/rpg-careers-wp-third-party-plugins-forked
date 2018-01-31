@@ -1,8 +1,8 @@
 <?php
 /*
-  Plugin Name: Oasis Workflow
+  Plugin Name: RPG VERSION :: Oasis Workflow
   Plugin URI: http://www.oasisworkflow.com
-  Description: Automate your WordPress Editorial Workflow with Oasis Workflow.
+  Description: RPG VERSION :: Automate your WordPress Editorial Workflow with Oasis Workflow.
   Version: 2.9
   Author: Nugget Solutions Inc.
   Author URI: http://www.nuggetsolutions.com

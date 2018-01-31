@@ -1,13 +1,13 @@
 <?php
 
 /**
- * Plugin Name: WP User Groups
+ * Plugin Name: RPG VERSION :: WP User Groups
  * Plugin URI:  https://wordpress.org/plugins/wp-user-groups/
  * Author:      John James Jacoby
  * Author URI:  https://profiles.wordpress.org/johnjamesjacoby/
  * License:     GPLv2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Description: Group users together with taxonomies & terms.
+ * Description: RPG VERSION :: Group users together with taxonomies & terms.
  * Version:     2.0.0
  * Text Domain: wp-user-groups
  * Domain Path: /wp-user-groups/assets/languages/
