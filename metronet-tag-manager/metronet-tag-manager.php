@@ -344,10 +344,13 @@ class Metronet_Tag_Manager {
 				}
 			}
 		}
-		echo "\n" . '<script>' . "\n";
-		echo sprintf( 'dataLayer = [%s];', wp_json_encode( $data_layer_array ) ) . "\n";
-		echo '</script>' . "\n";
-		
+
+		if(GTM_ON){
+			echo "\n" . '<script>' . "\n";
+			echo sprintf( 'dataLayer = [%s];', wp_json_encode( $data_layer_array ) ) . "\n";	
+			echo '</script>' . "\n";
+		}
+
 		//Output GTM Code
 		$gtm_code = stripslashes( $this->admin_options[ 'code_head' ] );
 		add_filter( 'safe_style_css', array( $this, 'safe_css' ) );
@@ -367,6 +370,7 @@ class Metronet_Tag_Manager {
 				
 			)
 		);
+		$gtm_code = apply_filters('filter_gtm_instance',$gtm_code);
 		$gtm_code = wp_kses( $gtm_code, $allowed_tags );
 		remove_filter( 'safe_style_css', array( $this, 'safe_css' ) );
 		echo $gtm_code;
@@ -395,6 +399,7 @@ class Metronet_Tag_Manager {
 				
 			)
 		);
+		$gtm_code = apply_filters('filter_gtm_instance',$gtm_code);
 		$gtm_code = wp_kses( $gtm_code, $allowed_tags );
 		remove_filter( 'safe_style_css', array( $this, 'safe_css' ) );
 		echo $gtm_code;
