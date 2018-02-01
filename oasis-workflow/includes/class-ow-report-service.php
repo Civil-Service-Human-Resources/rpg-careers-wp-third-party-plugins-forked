@@ -59,36 +59,28 @@ class OW_Report_Service {
       $option = get_option( 'oasiswf_custom_workflow_terminology' );
       $due_date_title = ! empty( $option[ 'dueDateText' ] ) ? $option[ 'dueDateText' ] : __( 'Due Date', 'oasisworkflow' );
 
-      echo "<tr>";
-
-      echo "<th>" . __( "Assigned User", "oasisworkflow" ) . "</th>";
-
+      $return_html = "<tr>";
       $sorting_args = add_query_arg( array( 'orderby' => 'post_title', 'order' => $sortby ) );
-      echo "<th width='300px' scope='col' class='sorted $post_order_class'>
+      $return_html .= "<th width='300px' scope='col' class='sorted $post_order_class'>
                         <a href='$sorting_args'>
-                        <span>" . __( "Post/Page", "oasisworkflow" ) . "</span>
+                        <span>" . __( "Page", "oasisworkflow" ) . "</span>
                         <span class='sorting-indicator'></span>
                         </a>
                      </th>";
-
-      $sorting_args = add_query_arg( array( 'orderby' => 'wf_name', 'order' => $sortby ) );
-      echo "<th width='200px' scope='col' class='sorted $wf_name_class'>
-                        <a href='$sorting_args'>
-                        <span>" . __( "Workflow [Step]", "oasisworkflow" ) . "</span>
-                        <span class='sorting-indicator'></span>
-                        </a>
-                     </th>";
-
-      echo "<th>" . __( "Status", "oasisworkflow" ) . "</th>";
-
+	  $return_html .=  "<th width='200px' scope='col'>". __( "Team", "oasisworkflow" ) . "</th>";
+	  $return_html .=  "<th>" . __( "Assigned to", "oasisworkflow" ) . "</th>";
+      $return_html .=  "<th width='200px' scope='col'>". __( "Step", "oasisworkflow" ) . "</th>";
+      $return_html .=  "<th>" . __( "Status", "oasisworkflow" ) . "</th>";
       $sorting_args = add_query_arg( array( 'orderby' => 'due_date', 'order' => $sortby ) );
-      echo "<th scope='col' class='sorted $due_date_class'>
+      $return_html .=  "<th scope='col' class='sorted $due_date_class'>
                         <a href='$sorting_args'>
                         <span>" . $due_date_title . "</span>
                         <span class='sorting-indicator'></span>
                         </a>
                      </th>";
-      echo "</tr>";
+      $return_html .=  "</tr>";
+
+	  return $return_html;
    }
    
    /*
@@ -103,15 +95,17 @@ class OW_Report_Service {
       // sanitize data
       $report_action = sanitize_text_field( $action );
       
-      echo "<tr>";
+      $return_html =   "<tr>";
       if ( $report_action == 'in-workflow' ) {
-         echo "<td scope='col' class='manage-column column-cb check-column'><input type='checkbox' name='abort-all'  /></td>";
+         $return_html .=   "<td scope='col' class='manage-column column-cb check-column'><input type='checkbox' name='abort-all'  /></td>";
       }
-      echo "<th width='300px'>" . __( "Title" ) . "</th>";
-      echo "<th class='report-header'>" . __( "Type" ) . "</th>";
-      echo "<th class='report-header'>" . __( "Author" ) . "</th>";
-      echo "<th class='report-header'>" . __( "Date" ) . "</th>";
-      echo "</tr>";
+      $return_html .=   "<th width='300px'>" . __( "Page" ) . "</th>";
+      $return_html .=   "<th class='report-header'>" . __( "Team" ) . "</th>";
+      $return_html .=   "<th class='report-header'>" . __( "Author" ) . "</th>";
+      $return_html .=   "<th class='report-header'>" . __( "Date" ) . "</th>";
+      $return_html .=   "</tr>";
+
+	  return $return_html;
    }
    
   
@@ -162,13 +156,16 @@ class OW_Report_Service {
          }
       }
 
-      $sql = "SELECT A.*, B.review_status, B.actor_id,
+      $sql = "SELECT A.*, B.review_status, B.actor_id, G.name as team,
       			B.next_assign_actors, B.step_id as review_step_id, B.action_history_id,C.workflow_id, C.wf_name, C.wf_version, C.step_info, posts.post_title, users.display_name as post_author, posts.post_type, posts.post_date
       			FROM " . OW_Utility::instance()->get_action_history_table_name() . " A
       			LEFT OUTER JOIN  " . OW_Utility::instance()->get_action_table_name() . " B ON A.ID = B.action_history_id
       			AND B.review_status = 'assignment'
 					LEFT JOIN {$wpdb->posts} AS posts ON posts.ID = A.post_id
-					LEFT JOIN {$wpdb->base_prefix}users AS users ON users.ID = posts.post_author
+					LEFT JOIN (SELECT XX.name, WW.post_id FROM ebdb.wp_postmeta WW LEFT JOIN wp_terms XX ON XX.term_id = WW.meta_value where meta_key = 'rpg-team') AS G
+                    ON A.post_id = G.post_id"
+					. OW_Utility::instance()->get_team_filter('A','D') .
+					"LEFT JOIN {$wpdb->base_prefix}users AS users ON users.ID = posts.post_author
 					LEFT JOIN (SELECT AA.*, BB.name as wf_name, BB.version as wf_version FROM " . OW_Utility::instance()->get_workflow_steps_table_name() . " AS AA LEFT JOIN " . OW_Utility::instance()->get_workflows_table_name() . " AS BB ON AA.workflow_id = BB.ID) AS C
 					ON A.step_id = C.ID WHERE 1=1 AND A.action_status = 'assignment'";
 

@@ -1,8 +1,7 @@
 jQuery( document ).ready( function () {
    if ( exit_wfid ) {
-      jQuery( "#publishing-action" ).append( "<div class='abort-workflow-section right'><a href='#' id='exit_link'>" + owf_abort_workflow_vars.abortWorkflow + "</a><span class='blank-space loading owf-hidden'></span></div>" );
+      jQuery( "#publishing-action" ).append( "<div class='abort-workflow-section' style='margin-top:0;'><input type='button' id='exit_link' class='button'" + " value='" + owf_abort_workflow_vars.abortWorkflow + "' style='margin-left:5px;' /></div>" );
       jQuery( '.error' ).hide();
-
    }
    jQuery( document ).on("click", "#exit_link", function(){
 		if(!confirm(owf_abort_workflow_vars.abortWorkflowConfirm))return ;

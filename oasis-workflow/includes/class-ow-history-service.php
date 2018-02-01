@@ -27,96 +27,10 @@ class OW_History_Service {
     * @since 2.0
     */
    public function __construct() {
-      add_action( 'wp_ajax_purge_workflow_history', array( $this, 'purge_history' ) );
       add_action( 'admin_init', array( $this, 'download_history_report' ) );
       // TODO: this might cause issues with other plugins - compatibility issues - for the time being this feature is turned off.
       //add_action( 'admin_menu', array( $this, 'create_meta_box' ) );
    }
-   
-    /*
-	 * AJAX function - Purge or Delete history
-	 * Given a timeframe till all history till that time.
-	 */
-   public function purge_history() {
-		global $wpdb;
-      
-      // nonce check
-		check_ajax_referer( 'owf-workflow-history', 'security' );
-      
-      // capability check
-		if ( ! current_user_can( 'ow_delete_workflow_history' ) ) {
-			wp_die( __( 'You are not allowed to delete workflow history.' ) );
-		}
-      
-      /* sanitize incoming data */
-		$period = sanitize_text_field( $_POST[ "range" ] );
-      
-		switch ( $period ) {
-			case 'one-month-ago' :
-				$range = " AND posts.post_modified < DATE(curdate() - INTERVAL 1 MONTH) ";
-				break;
-			case 'three-month-ago' :
-				$range = " AND posts.post_modified < DATE(curdate() - INTERVAL 3 MONTH) ";
-				break;
-			case 'six-month-ago' :
-				$range = " AND posts.post_modified < DATE(curdate() - INTERVAL 6 MONTH) ";
-				break;
-			case 'twelve-month-ago' :
-				$range = " AND posts.post_modified < DATE(curdate() - INTERVAL 12 MONTH) ";
-				break;
-			case 'everything' :
-				$range = " ";
-				break;
-			default:
-				return "not a valid period specified";
-		}
-
-		$sql = "SELECT distinct post_id FROM " . OW_Utility::instance()->get_action_history_table_name() . " WHERE post_id IN
-		(SELECT ID from
-		(SELECT posts.ID from " . $wpdb->posts . " AS posts WHERE 1=1 " . $range .
-		" AND posts.id NOT IN " .
-		"(SELECT A.post_id FROM
-		(SELECT * FROM " . OW_Utility::instance()->get_action_history_table_name() . " WHERE action_status = 'assignment') as A
-		LEFT OUTER JOIN
-		(SELECT * FROM " . OW_Utility::instance()->get_action_table_name() . " WHERE review_status = 'assignment') as B
-		ON A.ID = B.action_history_id ) ) as wp_posts_temp )";
-
-		$posts_not_in_workflow_array = array();
-		$posts_not_in_workflow_results = $wpdb->get_results( $sql );
-		if ( empty( $posts_not_in_workflow_results ) ) {
-			wp_send_json_success( array( 'result' => "success_no_history_deleted" ) );
-		}
-		foreach ( $posts_not_in_workflow_results as $post_not_in_workflow ) {
-			array_push( $posts_not_in_workflow_array, $post_not_in_workflow->post_id );
-		}
-
-		$int_place_holders = array_fill( 0, count( $posts_not_in_workflow_array ), '%d' );
-		$place_holders_for_post_ids = implode( ",", $int_place_holders );
-		$sql = "SELECT ID FROM " . OW_Utility::instance()->get_action_history_table_name() . " WHERE 1=1 AND post_id in (" . $place_holders_for_post_ids . ")";
-		$history_results = $wpdb->get_results( $wpdb->prepare( $sql, $posts_not_in_workflow_array ) );
-
-		// first delete any records from fc_action table
-		if ( empty( $history_results ) ) {
-			wp_send_json_success( array( 'result' => "success_no_history_deleted" ) );
-		}
-		$history_id_array = array();
-		foreach ( $history_results as $history ) {
-			array_push( $history_id_array, $history->ID );
-		}
-
-		$int_place_holders = array_fill( 0, count( $history_id_array ), '%d' );
-		$place_holders_for_history_ids = implode( ",", $int_place_holders );
-
-		// delete workflow history from action table
-		$sql = "DELETE from " . OW_Utility::instance()->get_action_table_name() . " WHERE action_history_id in (" . $place_holders_for_history_ids . ")";
-		$wpdb->get_results( $wpdb->prepare( $sql, $history_id_array ) );
-
-		// delete workflow history from action history table
-		$sql = "DELETE from " . OW_Utility::instance()->get_action_history_table_name() . " WHERE id in (" . $place_holders_for_history_ids . ")";
-		$wpdb->get_results( $wpdb->prepare( $sql, $history_id_array ) );
-
-		wp_send_json_success( array( 'result' => "success_history_deleted" ) );
-	}
 
    /**
     * This action handles download history report AJAX request
@@ -304,15 +218,14 @@ class OW_History_Service {
       if ( $post_id ) {
          $where_clause .= " AND post_id= %d ";
       }
-      $sql = "SELECT A.* , B.post_title, C.ID as userid, C.display_name as assign_actor, D.step_info, D.workflow_id, D.wf_name, D.version
+      $sql = "SELECT A.*, G.name as team, B.post_title, C.ID as userid, C.display_name as assign_actor, D.step_info, D.workflow_id, D.wf_name, D.version
 					FROM
-					((SELECT * FROM " . OW_Utility::instance()->get_action_history_table_name() . " WHERE $where_clause) AS A
-					LEFT JOIN
-					{$wpdb->posts} AS B
-					ON  A.post_id = B.ID
+					((SELECT * FROM " . OW_Utility::instance()->get_action_history_table_name() . " WHERE $where_clause) AS A" . OW_Utility::instance()->get_team_filter('A','B') . "
 					LEFT JOIN
 					{$wpdb->users} AS C
 					ON A.assign_actor_id = C.ID
+					LEFT JOIN (SELECT XX.name, WW.post_id FROM ebdb.wp_postmeta WW LEFT JOIN wp_terms XX ON XX.term_id = WW.meta_value where meta_key = 'rpg-team') AS G
+                    ON A.post_id = G.post_id
 					LEFT JOIN
 					(SELECT AA.*, BB.name as wf_name, BB.version FROM " . OW_Utility::instance()->get_workflow_steps_table_name() . " AS AA LEFT JOIN " . OW_Utility::instance()->get_workflows_table_name() . " AS BB ON AA.workflow_id = BB.ID) AS D
 					ON A.step_id = D.ID)
@@ -390,7 +303,7 @@ class OW_History_Service {
       } else {
          $order_by_clause = " ORDER BY " . $order_by . " DESC ";
       }
-      $results = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM " . OW_Utility::instance()->get_action_table_name() . " WHERE action_history_id = %d " . $order_by_clause, $action_history_id ) );
+      $results = $wpdb->get_results( $wpdb->prepare( "SELECT A.*, C.display_name as assign_actor FROM " . OW_Utility::instance()->get_action_table_name() . " AS A LEFT JOIN wp_users AS C ON A.actor_id = C.ID WHERE action_history_id = %d " . $order_by_clause, $action_history_id ) );
       foreach ( $results as $result ) {
          $review_history = $this->get_review_history_from_result_set( $result );
          array_push( $review_histories, $review_history );
@@ -598,31 +511,18 @@ class OW_History_Service {
 
       $where_post = ( isset( $_GET[ 'post' ] ) && sanitize_text_field( $_GET[ "post" ] )) ? "&post=" . intval( sanitize_text_field( $_GET[ "post" ] ) ) : "";
 
-      echo "<tr>";
-      echo "<td scope='col' class='manage-column check-column' ><input type='checkbox'></td>";
-      echo "<th scope='col' class='history-title sorted $post_order_class'>
-		<a href='admin.php?page=oasiswf-history&orderby=post_title&order=$order" . $where_post . "'>
-					<span>" . __( "Title", "oasisworkflow" ) . "</span>
-					<span class='sorting-indicator'></span>
-				</a>
-			</th>";
-      echo "<th class='history-header'>" . __( "Actor", "oasisworkflow" ) . "</th>";
-      echo "<th scope='col' class='history-workflow sorted $wf_order_class'>
-		<a href='admin.php?page=oasiswf-history&orderby=wf_name&order=$order" . $where_post . "'>
-					<span>" . __( "Workflow [Step]", "oasisworkflow" ) . "</span>
-					<span class='sorting-indicator'></span>
-				</a>
-			</th>";
-      echo "<th scope='col' class='history-date-time sorted $create_date_order_class'>
-		<a href='admin.php?page=oasiswf-history&orderby=create_datetime&order=$order" . $where_post . "'>
-					<span>" . __( "Assigned date", "oasisworkflow" ) . "</span>
-					<span class='sorting-indicator'></span>
-				</a>
-			</th>";
-      echo "<th scope='col' class='history-date-time'>" . __( "Sign off date", "oasisworkflow" ) . "</th>";
-      echo "<th scope='col' class='history-header'>" . __( "Result", "oasisworkflow" ) . "</th>";
-      echo "<th scope='col' class='history-comment'>" . __( "Comments", "oasisworkflow" ) . "</th>";
-      echo "</tr>";
+	 $return_html = "<tr>";
+     $return_html .= "<th scope='col' class='history-title sorted ". $post_order_class. "' style='width:28%;'><a href='admin.php?page=oasiswf-history&orderby=post_title&order=". $order . $where_post . "'><span>" . __( "Page", "oasisworkflow" ) . "</span><span class='sorting-indicator'></span></a></th>";
+	 $return_html .= "<th class='history-header' style='width:12%;'>" . __( "Team", "oasisworkflow" ) . "</th>";
+	 $return_html .= "<th class='history-header' style='width:12%;'>" . __( "Actor", "oasisworkflow" ) . "</th>";
+	 $return_html .= "<th class='history-header' style='width:12%;'>" . __( "Step", "oasisworkflow" ) . "</th>";
+     $return_html .= "<th scope='col' class='history-date-time sorted ". $create_date_order_class. "' style='width:10%;'><a href='admin.php?page=oasiswf-history&orderby=create_datetime&order=". $order . $where_post . "'><span>" . __( "Start", "oasisworkflow" ) . "</span><span class='sorting-indicator'></span></a></th>";
+     $return_html .= "<th scope='col' class='history-date-time' style='width:10%;'>" . __( "End", "oasisworkflow" ) . "</th>";
+     $return_html .= "<th scope='col' class='history-header' style='width:10%;'>" . __( "Status", "oasisworkflow" ) . "</th>";
+     $return_html .= "<th scope='col' class='history-comment' style='width:6%;'>" . __( "Comments", "oasisworkflow" ) . "</th>";
+     $return_html .= "</tr>";
+
+	 return $return_html;
    }
 
    /**
@@ -669,9 +569,12 @@ class OW_History_Service {
       $review_history->due_date = $result->due_date;
       $review_history->action_history_id = $result->action_history_id;
       $review_history->update_datetime = $result->update_datetime;
+	  $review_history->assign_actor = $result->assign_actor;
 
       return $review_history;
    }
+
+   
 
 }
 

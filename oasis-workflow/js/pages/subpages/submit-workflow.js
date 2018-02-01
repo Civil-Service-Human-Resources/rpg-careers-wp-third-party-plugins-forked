@@ -1,5 +1,5 @@
-jQuery( document ).ready( function () {
-   var stepProcess = "";
+(function(){
+
    //------main function-------------
    function load_setting() {
       var allowed_post_types = jQuery.parseJSON( owf_submit_workflow_vars.allowedPostTypes );
@@ -10,8 +10,8 @@ jQuery( document ).ready( function () {
       {
 
          jQuery( "#publishing-action" ).append(
-                 "<input type='button' id='workflow_submit' class='button button-primary button-large'" + " value='" + owf_submit_workflow_vars.submitToWorkflowButton + "' style='float:left;clear:both;' />"
-                 ).css( { "width": "100%" } );
+                 "<input type='button' id='workflow_submit' class='button button-primary button-large'" + " value='" + owf_submit_workflow_vars.submitToWorkflowButton + "' style='margin-left:5px;' />"
+                 );
 
          jQuery( "#post" ).append(
                  "<input type='hidden' id='hi_workflow_id' name='hi_workflow_id' />" +
@@ -23,31 +23,17 @@ jQuery( document ).ready( function () {
                  "<input type='hidden' id='hi_comment' name='hi_comment' />" +
                  "<input type='hidden' id='save_action' name='save_action' />"
                  );
-         jQuery( "#publishing-action" ).css( { "margin-top": "10px" } );
       }
-
-//		jQuery('.inline-edit-status').hide() ;
    }
    
    
    load_setting();
    
-   jQuery( document ).on( "click", "#workflow_submit", function () {
+    
+})();
 
-      // hook for custom validation before submitting to the workflow
-      if ( typeof owSubmitToWorkflowPre === 'function' ) {
-         var pre_submit_to_workflow_result = owSubmitToWorkflowPre();
-         if ( pre_submit_to_workflow_result == false ) {
-            return false;
-         }
-      }
-
-      // hook for running ACF or other third party plugin validations if needed before submitting to the workflow
-      owThirdPartyValidation.run( workflowSubmit );
-//      jQuery('.simplemodal-wrap').css('overflow', 'hidden');
-//      jQuery('.simplemodal-container').css('height', '100%');
-
-   } );
+jQuery( document ).ready( function () {
+    var stepProcess = "";
 
    jQuery( ".date-clear" ).click( function () {
       jQuery( this ).parent().children( ".date_input" ).val( "" );
@@ -60,6 +46,20 @@ jQuery( document ).ready( function () {
    jQuery( "#workflow-select" ).change( function () {
       workflow_select( jQuery( this ).val() );
    } );
+
+    jQuery('#workflow_submit').on('click', function(){
+
+      // hook for custom validation before submitting to the workflow
+      if ( typeof owSubmitToWorkflowPre === 'function' ) {
+         var pre_submit_to_workflow_result = owSubmitToWorkflowPre();
+         if ( pre_submit_to_workflow_result == false ) {
+            return false;
+         }
+      }
+
+      // hook for running ACF or other third party plugin validations if needed before submitting to the workflow
+      owThirdPartyValidation.run( workflowSubmit );
+    });
 
    /* On Change of Workflow Step during Submit to Workflow */
    jQuery(document).on("change", "#step-select", function () {

@@ -156,10 +156,13 @@ class OW_Utility {
     * @return string formatted date
     */
    public function format_date_for_display( $date, $format = "-", $date_form = "date" ) {
-      // only date
+
+		if(strlen($date)==0) return "&mdash;";
+
+	  // only date
       if( $date_form == "date" ) {
          if( $date == "0000-00-00" ) {
-            return "";
+            return "&mdash;";
          }
          if( $date ) {
             $formatted_date = mysql2date( get_option( 'date_format' ), $date );
@@ -169,7 +172,7 @@ class OW_Utility {
          $date_time = explode( " ", $date );
 
          if( $date_time[0] == "0000-00-00" ) {
-            return "";
+            return "&mdash;";
          }
 
          if( $date_time[0] ) {
@@ -1012,7 +1015,52 @@ class OW_Utility {
       return false;
 
    }
+
+   public function get_team_filter($table_alias_left,$table_alias_right, $id_column='post_id'){
+		$nofilter = current_user_can('manage_options');
+		//$nofilter = false;
+		return " INNER JOIN (SELECT EE.*".(!$nofilter ?', FF.*':'')." FROM wp_posts EE ".(!$nofilter?'LEFT JOIN wp_postmeta FF ON EE.ID = FF.post_id  WHERE EE.post_type = "page" AND (FF.meta_key = "rpg-team" AND FF.meta_value IN (SELECT  t.term_id FROM wp_terms AS t  INNER JOIN wp_term_taxonomy AS tt ON t.term_id = tt.term_id INNER JOIN wp_term_relationships AS tr ON tr.term_taxonomy_id = tt.term_taxonomy_id WHERE tt.taxonomy = "content_team" AND tr.object_id = '.get_current_user_id().'))':'') . ") AS ". $table_alias_right . " ON ". $table_alias_left . '.' . $id_column . " = " . $table_alias_right . ".ID ";
+   }
+
+   public function see_all_teams(){
+		return current_user_can('manage_options');
+   }
+
+	public function is_in_team($user_id_with_teams, $user_id_to_check){
+		if($this->see_all_teams()){
+			return true;
+		}
+
+		global $wpdb;
+
+		$user_id_teams = intval( $user_id_with_teams );
+		$user_id_look_for = intval( $user_id_to_check );
+
+		$sql = "SELECT COUNT(*) as row_count FROM wp_users AS USERS
+				LEFT JOIN (SELECT t.term_id, t.name as team, tr.object_id FROM wp_terms AS t INNER JOIN wp_term_taxonomy AS tt ON t.term_id = tt.term_id INNER JOIN wp_term_relationships AS tr ON tr.term_taxonomy_id = tt.term_taxonomy_id WHERE tt.taxonomy = 'content_team') AS D ON USERS.ID = D.object_id
+				where D.term_id IN (SELECT D.term_id FROM wp_users AS USERS
+				LEFT JOIN (SELECT t.term_id, t.name as team, tr.object_id FROM wp_terms AS t INNER JOIN wp_term_taxonomy AS tt ON t.term_id = tt.term_id INNER JOIN wp_term_relationships AS tr ON tr.term_taxonomy_id = tt.term_taxonomy_id WHERE tt.taxonomy = 'content_team') 
+				AS D ON USERS.ID = D.object_id
+				where USERS.ID = %d) AND USERS.ID = %d";
+
+		$result = $wpdb->get_results( $wpdb->prepare( $sql, $user_id_with_teams, $user_id_to_check ) );
+
+		if($result){
+			foreach ($result as $row){
+				if($row->row_count > 0){
+					return true;
+				}
+
+			}
+		}
+		return false;
+	}
+
+	public function get_display_name($user_id) {
+		if (!$user = get_userdata($user_id))
+		return false;
+		return $user->data->display_name;
+	} 
     
 }
-
 ?>

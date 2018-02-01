@@ -18,6 +18,7 @@ if ( $action == "in-workflow" ) {
 
 $count_posts = count( $posts );
 $per_page = OASIS_PER_PAGE;
+$header = $ow_report_service->get_submission_report_table_header($action);
 ?>
 <div class="wrap">
     <div id="view-workflow">
@@ -25,13 +26,6 @@ $per_page = OASIS_PER_PAGE;
             <div class="tablenav top">
                 <input type="hidden" name="page" value="oasiswf-submission" />
                 <input type="hidden" id="action" name="action" value="<?php echo esc_attr( $action ); ?>" />
-                <div class="alignleft actions">
-                    <select name="type">
-                        <option value="all" <?php echo ( $post_type == "all" ) ? "selected" : ""; ?> >All Types</option>
-                        <?php OW_Utility::instance()->owf_dropdown_post_types_multi( $post_type ); ?>
-                    </select>
-                    <input type="submit" class="button action" value="Filter" />
-                </div>
                 <div>
                     <ul class="subsubsub">
                         <?php
@@ -51,12 +45,8 @@ $per_page = OASIS_PER_PAGE;
             </div>
         </form>
         <table class="wp-list-table widefat fixed posts" cellspacing="0" border=0>
-            <thead>
-               <?php $ow_report_service->get_submission_report_table_header( $action ); ?>
-            </thead>
-            <tfoot>
-               <?php $ow_report_service->get_submission_report_table_header( $action ); ?>
-            </tfoot>
+            <thead><?php echo $header; ?></thead>
+			<tfoot><?php echo $header; ?></tfoot>
             <tbody id="coupon-list">
                 <?php
                 if ( $posts ):
@@ -73,7 +63,7 @@ $per_page = OASIS_PER_PAGE;
                             echo "<td><input type='checkbox' id='abort-" . $post->ID . "' value='" . esc_attr( $post->ID ) . "' name='abort' /></td>";
                          }
                          echo "<td><a href='post.php?post=" . $post->ID . "&action=edit'>{$post->post_title}</a></td>";
-                         echo "<td>{$post->post_type}</td>";
+						 echo "<td>".(strlen($post->team)==0?'&mdash;' :$post->team)."</td>";
                          echo "<td>{$user->data->display_name}</td>";
                          echo "<td>" . OW_Utility::instance()->format_date_for_display( $post->post_date, "-", "datetime" ) . "</td>";
                          echo "</tr>";
@@ -84,7 +74,7 @@ $per_page = OASIS_PER_PAGE;
                    echo "<tr>";
                    echo "<td class='hurry-td' colspan='4'>
 							<label class='hurray-lbl'>";
-                   echo __( "No Posts/Pages found in any workflows." );
+                   echo __( "No Pages found" );
                    echo "</label></td>";
                    echo "</tr>";
                 endif;

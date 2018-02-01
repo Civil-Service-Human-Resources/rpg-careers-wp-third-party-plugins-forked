@@ -128,52 +128,44 @@ class OW_Inbox_Service {
 			}
 		}
 		$workflow_terminology_options = get_option( 'oasiswf_custom_workflow_terminology' );
-		$due_date = ! empty( $workflow_terminology_options['dueDateText'] ) ? $workflow_terminology_options['dueDateText'] : __( 'Due Date', 'oasisworkflow' );
+		$due_date = ! empty( $workflow_terminology_options['dueDateText'] ) ? $workflow_terminology_options['dueDateText'] : __( 'Due', 'oasisworkflow' );
 		$priority = ! empty( $workflow_terminology_options['taskPriorityText'] ) ? $workflow_terminology_options['taskPriorityText'] : __( 'Priority', 'oasisworkflow' );
-		echo "<tr>";
-		echo "<td scope='col' class='manage-column column-cb check-column'><input type='checkbox'></td>";
+		$return_html = "<tr>";
 		$sorting_args = add_query_arg( array( 'orderby' => 'post_title', 'order' => $sortby ) );
-		echo "<th width='300px' scope='col' class='sorted $post_order_class'>
+		$return_html .= "<th width='35%' scope='col' class='sorted $post_order_class'>
 		<a href='$sorting_args'>
-		<span>" . __( "Post/Page", "oasisworkflow" ) . "</span>
+		<span>" . __( "Page", "oasisworkflow" ) . "</span>
 					<span class='sorting-indicator'></span>
 				</a>
 				</th>";
-
-		if ( get_option( 'oasiswf_priority_setting' ) == 'enable_priority' ) {
-         $sorting_args = add_query_arg( array( 'orderby' => 'priority', 'order' => $sortby ) );
-         echo "<th scope='col' class='sorted $priority_class'>
-		          <a href='$sorting_args'>
-		             <span>" . $priority . "</span>
-		             <span class='sorting-indicator'></span>
-		          </a>
-              </th>";
-      }
-
-		$sorting_args = add_query_arg( array( 'orderby' => 'post_type', 'order' => $sortby ) );
-		echo "<th scope='col' class='sorted $post_type_class'>
-		<a href='$sorting_args'>
-		<span>" . __( "Type", "oasisworkflow" ) . "</span>
-					<span class='sorting-indicator'></span>
-			</a>
-			</th>";
+		$return_html .= "<th scope='col' width='12%'>". __( "Team", "oasisworkflow" ) . "</th>";
 		$sorting_args = add_query_arg( array( 'orderby' => 'post_author', 'order' => $sortby ) );
-		echo "<th scope='col' class='sorted $author_class'>
+		$return_html .= "<th scope='col' class='sorted $author_class' width='12%'>
 		<a href='$sorting_args'>
 		<span>" . __( "Author", "oasisworkflow" ) . "</span>
 					<span class='sorting-indicator'></span>
 			</a>
 			</th>";
-		echo "<th class='inbox-workflow'>" . __( "Workflow [Step]", "oasisworkflow" ) . "</th>";
-		echo "<th class='inbox-category'>" . __( "Category", "oasisworkflow" ) . "</th>";
-		echo "<th scope='col' class='sorted $due_date_class'>
+		$return_html .= "<th class='inbox-workflow'>" . __( "Step", "oasisworkflow" ) . "</th>";
+		if ( get_option( 'oasiswf_priority_setting' ) == 'enable_priority' ) {
+         $sorting_args = add_query_arg( array( 'orderby' => 'priority', 'order' => $sortby ) );
+         $return_html .= "<th scope='col' class='sorted $priority_class'>
+		          <a href='$sorting_args'>
+		             <span>" . $priority . "</span>
+		             <span class='sorting-indicator'></span>
+		          </a>
+              </th>";
+		}
+		$return_html .= "<th scope='col' class='sorted $due_date_class'>
 		<a href='admin.php?page=oasiswf-inbox&orderby=due_date&order=$sortby" . "'>
 					<span>" . $due_date . "</span>
 					<span class='sorting-indicator'></span>
 			</a>
 			</th>";
-		echo "<th class='inbox-comments'>" . __( "Comments", "oasisworkflow" ) . "</th>";
-		echo "</tr>";
+		$return_html .= "<th class='inbox-comments'>" . __( "Comments", "oasisworkflow" ) . "</th>";
+		$return_html .= "</tr>";
+
+		return $return_html;
 	}
 
    /**

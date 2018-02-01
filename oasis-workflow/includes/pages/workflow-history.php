@@ -18,36 +18,15 @@ $workflow_service = new OW_Workflow_Service();
 $ow_process_flow = new OW_Process_Flow();
 
 $histories = $ow_history_service->get_workflow_history_all( $selected_post );
-$count_posts = $ow_history_service->get_workflow_history_count( $selected_post );
+$count_posts = count($histories);
 $per_page = OASIS_PER_PAGE;
 $workflow_history = OW_Utility::instance()->get_custom_workflow_terminology( 'workflowHistoryText' );
+$header = $ow_history_service->get_table_header();
+$row_added_count = 0;
 ?>
 <div class="wrap">
     <div id="icon-edit" class="icon32 icon32-posts-post"><br></div>
-    <h2><?php echo $workflow_history; ?></h2>
-    <?php if( ! empty( $trashed ) && $trashed === "success_history_deleted" ): ?>
-       <div id="message" class="updated notice notice-success is-dismissible">
-           <p>
-               <?php echo __( "Workflow history deleted successfully.", "oasisworkflow" ); ?>
-           </p>
-           <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button>
-       </div>
-    <?php endif; ?>
-   <?php if( ! empty( $trashed ) && $trashed === "success_no_history_deleted" ): ?>
-      <div id="message" class="updated notice notice-success is-dismissible">
-         <p>
-            <?php echo __( "No eligible workflow history found to delete.", "oasisworkflow" ); ?>
-         </p>
-         <button type="button" class="notice-dismiss"><span class="screen-reader-text">Dismiss this notice.</span></button>
-      </div>
-   <?php endif; ?>
-    <?php if ( ! empty( $trashed ) && $trashed === "error" ): ?>
-       <div id="message " class="error">
-           <p>
-               <?php echo __( "There was an error while deleting the history. Try again OR contact your administrator.", "oasisworkflow" ); ?>
-           </p>
-       </div>
-    <?php endif; ?>
+    <h1><?php echo $workflow_history; if($selected_post){ echo ' &mdash; '.get_the_title($selected_post); }else{ echo ' &mdash; all pages'; } ?></h1>
     <div id="view-workflow" class="workflow-history">
         <div class="tablenav">
            <form method="post" 
@@ -55,7 +34,7 @@ $workflow_history = OW_Utility::instance()->get_custom_workflow_terminology( 'wo
                  action="<?php echo wp_nonce_url( admin_url( 'admin.php?page=oasiswf-history' ), 'owf-workflow-history', 'security' ); ?>">
             <div class="alignleft actions">
                <select id="post_filter" name="post_filter">
-                    <option selected="selected" value="0"><?php echo __( "View Post/Page Workflow History", "oasisworkflow" ) ?></option>
+                    <option selected="selected" value="0"><?php echo __( "Filter by page", "oasisworkflow" ) ?></option>
                     <?php
                     $wf_posts = $ow_process_flow->get_posts_in_all_workflow();
                     if ( $wf_posts ) {
@@ -70,39 +49,24 @@ $workflow_history = OW_Utility::instance()->get_custom_workflow_terminology( 'wo
                     ?>
                 </select>
 
-                <a href="javascript:window.open('<?php echo admin_url( 'admin.php?page=oasiswf-history&post=' ) ?>' + jQuery('#post_filter').val() + '<?php echo '&_wpnonce=' . wp_create_nonce( 'owf_view_history_nonce' ); ?>', '_self')">
-                    <input type="button" class="button-secondary action" value="<?php echo __( "Filter", "oasisworkflow" ); ?>" />
-                </a>&nbsp;
-
+                <a style="margin-right:10px;" href="javascript:window.open('<?php echo admin_url( 'admin.php?page=oasiswf-history&post=' ) ?>' + jQuery('#post_filter').val() + '<?php echo '&_wpnonce=' . wp_create_nonce( 'owf_view_history_nonce' ); ?>', '_self')">
+                    <input type="button" class="button-secondary action" value="<?php echo __( "Apply", "oasisworkflow" ); ?>" /></a>
                 <?php
                 if ( current_user_can( 'ow_download_workflow_history' ) ) {
                    ?>
-                   <!-- Download Report Button -->
-                   <input type="submit" class="button-secondary action" name="download_history" id="download" value="<?php echo __( "Download Workflow History Report", "oasisworkflow" ); ?>" />
+                   <input type="submit" class="button-secondary action" name="download_history" id="download" value="<?php echo __( "Download Workflow History", "oasisworkflow" ); ?>" />
                    <?php
                 }
                 ?>
-                <?php
-                if ( current_user_can( 'ow_delete_workflow_history' ) ) {
-                   ?>
-                   <input type="button" class="button-secondary action" id="owf-delete-history" value="<?php echo __( "Delete History", "oasisworkflow" ); ?>" />
-                   <?php
-                }
-                ?>
-
             </div>
            </form>
-            <div class="tablenav-pages">
-                <?php OW_Utility::instance()->get_page_link( $count_posts, $pagenum, $per_page ); ?>
+            <div id="hist-nav-top" class="tablenav-pages">
+                <?php if($count_posts > 0) OW_Utility::instance()->get_page_link( $count_posts, $pagenum, $per_page ); ?>
             </div>
         </div>
         <table class="wp-list-table widefat fixed posts" cellspacing="0" border=0>
-            <thead>
-                <?php $ow_history_service->get_table_header(); ?>
-            </thead>
-            <tfoot>
-                <?php $ow_history_service->get_table_header(); ?>
-            </tfoot>
+            <thead><?php echo $header; ?></thead>
+            <tfoot><?php echo $header; ?></tfoot>
             <tbody id="coupon-list">
                 <?php
                 if ( $histories ):
@@ -110,31 +74,30 @@ $workflow_history = OW_Utility::instance()->get_custom_workflow_terminology( 'wo
                    $start = ($pagenum - 1) * $per_page;
                    $end = $start + $per_page;
                    foreach ( $histories as $row ) {
-                      $workflow_name = "<a href='admin.php?page=oasiswf-admin&wf_id=" . $row->workflow_id . "'><strong>" . $row->wf_name;
+                      $workflow_name = $row->wf_name;
                       if ( ! empty( $row->version ) ) {
-                         $workflow_name .= " (" . $row->version . ")";
+                         $workflow_name .= " (v" . $row->version . ")";
                       }
-                      $workflow_name .= "</strong></a>";
-
                       if ( $count >= $end )
                          break;
                       if ( $count >= $start ) {
                          if ( $row->assign_actor_id != -1 ) { //assignment and/or publish steps
                             echo "<tr>";
-                            echo "<th scope='row' class='check-column'><input type='checkbox' name='linkcheck[]' value='1'></th>";
                             echo "<td>
 										<a href='post.php?post={$row->post_id}&action=edit'><strong>{$row->post_title}</strong></a>
 									</td>";
                             if ( $row->userid == 0 ) {
                                $actor = "System";
                             } else {
-                               $actor = OW_Utility::instance()->get_user_name( $row->userid );
+							   $actor = $row->assign_actor;
                                if ( empty( $actor ) ) { // in case the actor is deleted or non existent
                                   $actor = "System";
                                }
                             }
-                            echo "<td>{$actor}</td>";
-                            echo "<td>{$workflow_name} <br> [{$workflow_service->get_step_name( $row )}]</td>";              
+							$row_added_count++;
+                            echo "<td>".(strlen($row->team)==0?'&mdash;' :$row->team)."</td>";
+							echo "<td>{$actor}</td>";
+                            echo "<td>{$workflow_service->get_step_name( $row )}<br/><span style='font-size:9px;'>{$workflow_name}</span></td>";              
                             echo "<td>" . OW_Utility::instance()->format_date_for_display( $row->create_datetime, "-", "datetime" ) . "</td>";
                             echo "<td>" . OW_Utility::instance()->format_date_for_display( $ow_process_flow->get_sign_off_date( $row ), "-", "datetime" ) . "</td>";
                             echo "<td>{$ow_process_flow->get_sign_off_status( $row )}</td>";
@@ -154,23 +117,26 @@ $workflow_history = OW_Utility::instance()->get_custom_workflow_terminology( 'wo
                             $review_rows = $ow_history_service->get_review_action_by_history_id( $row->ID, "update_datetime" );
                             if ( $review_rows ) {
                                foreach ( $review_rows as $review_row ) {
+
                                   echo "<tr>";
-                                  echo "<th scope='row' class='check-column'><input type='checkbox' name='linkcheck[]' value='1'></th>";
                                   echo "<td><a href='post.php?post={$row->post_id}&action=edit'><strong>{$row->post_title}</strong></a></td>";
                                   if ( $review_row->actor_id == 0 ) {
                                      $actor = "System";
                                   } else {
-                                     $actor = OW_Utility::instance()->get_user_name( $review_row->actor_id );
-                                     if ( empty( $actor ) ) { // in case the actor is deleted or non existent
-                                        $actor = "System";
-                                     }
+									$actor = $review_row->assign_actor;
+                                    if ( empty( $actor ) ) { // in case the actor is deleted or non existent
+										$actor = "System";
+                                    }
                                   }
+								  $row_added_count++;
+								  echo "<td>&mdash;</td>";
                                   echo "<td>{$actor}</td>";
-                                  echo "<td>{$workflow_name} <br> [{$workflow_service->get_step_name( $row )}]</td>";              
+                                  echo "<td>{$workflow_service->get_step_name( $row )}<br/><span style='font-size:9px;'>{$workflow_name}</span></td>";
                                   echo "<td>" . OW_Utility::instance()->format_date_for_display( $row->create_datetime, "-", "datetime" ) . "</td>";
                                   $signoff_date = $review_row->update_datetime;
                                   echo "<td>" . OW_Utility::instance()->format_date_for_display( $signoff_date, "-", "datetime" ) . "</td>";
                                   // If editors' review status is "no_action" (Not acted upon) then set user status as "No action taken"
+								  $review_status = "&mdash";
                                   if ( $review_row->review_status == "no_action" || $review_row->review_status == "abort_no_action" ) {
                                      $review_status = __( "No Action Taken", "oasisworkflow" );
                                   } else {
@@ -201,8 +167,8 @@ $workflow_history = OW_Utility::instance()->get_custom_workflow_terminology( 'wo
                    }
                 else:
                    echo "<tr>";
-                   echo "<td colspan='9' class='no-found-td'><lavel>";
-                   echo __( "No workflow history data found.", "oasisworkflow" );
+                   echo "<td colspan='9' class='no-found-td'><label>";
+                   echo __( "No workflow history data found", "oasisworkflow" );
                    echo "</label></td>";
                    echo "</tr>";
                 endif;
@@ -212,12 +178,18 @@ $workflow_history = OW_Utility::instance()->get_custom_workflow_terminology( 'wo
         <?php wp_nonce_field( 'owf-workflow-history', 'owf_workflow_history_nonce' ); ?>
         <input type="hidden" name="owf_inbox_ajax_nonce" id="owf_inbox_ajax_nonce" value="<?php echo wp_create_nonce( 'owf_inbox_ajax_nonce' ); ?>" />
         <div class="tablenav">
-            <div class="tablenav-pages">
-                <?php OW_Utility::instance()->get_page_link( $count_posts, $pagenum, $per_page ); ?>
+            <div id="hist-nav-bot" class="tablenav-pages">
+                <?php if($row_added_count > 0) OW_Utility::instance()->get_page_link( $row_added_count, $pagenum, $per_page ); ?>
             </div>
+			<?php 
+				if($count_posts > 0 && $row_added_count > 0) {
+					if($row_added_count != $count_posts){
+						echo '<script type="text/javascript">(function(){document.getElementById("hist-nav-top").innerHTML = document.getElementById("hist-nav-bot").innerHTML;})();</script>';
+					}
+				}
+			?>
         </div>
     </div>
 </div>
-
 <div id="post_com_count_content"></div>
 <div id="ajaxcc"></div>

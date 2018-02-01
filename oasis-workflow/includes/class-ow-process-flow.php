@@ -1081,8 +1081,17 @@ class OW_Process_Flow {
 		UNION
 		SELECT U2.ID, U2.display_name FROM {$wpdb->users} AS U2
 		LEFT JOIN " . OW_Utility::instance()->get_action_table_name() . " AS A ON U2.ID = A.actor_id
-					WHERE A.review_status = 'assignment') USERS
-					ORDER BY USERS.DISPLAY_NAME ";
+		WHERE A.review_status = 'assignment') USERS
+		left JOIN (SELECT t.term_id, t.name as team, tr.object_id FROM wp_terms AS t INNER JOIN wp_term_taxonomy AS tt ON t.term_id = tt.term_id INNER JOIN wp_term_relationships AS tr ON tr.term_taxonomy_id = tt.term_taxonomy_id WHERE tt.taxonomy = 'content_team') AS D ON USERS.ID = D.object_id";
+		
+		if(!OW_Utility::instance()->see_all_teams()){
+			$sql .= " where D.term_id IN ( SELECT D.term_id FROM wp_users AS USERS
+					left JOIN (SELECT t.term_id, t.name as team, tr.object_id FROM wp_terms AS t INNER JOIN wp_term_taxonomy AS tt ON t.term_id = tt.term_id INNER JOIN wp_term_relationships AS tr ON tr.term_taxonomy_id = tt.term_taxonomy_id WHERE tt.taxonomy = 'content_team') 
+					AS D ON USERS.ID = D.object_id
+					where USERS.ID = ". wp_get_current_user()->ID . ")";
+		}
+
+		$sql .= " group by USERS.ID ORDER BY USERS.DISPLAY_NAME";
 
       $result = $wpdb->get_results( $sql );
       return $result;
@@ -1193,7 +1202,7 @@ class OW_Process_Flow {
 
       // added a left outer join to priority, since it may or may not be present.
 
-      $sql = "SELECT A.*, postmeta.meta_value AS priority, B.review_status, B.actor_id,
+      $sql = "SELECT A.*, D.name as team, postmeta.meta_value AS priority, B.review_status, B.actor_id,
       			B.next_assign_actors, B.step_id as review_step_id, B.action_history_id, B.update_datetime,
       			posts.post_title, users.display_name as post_author, posts.post_type
       			FROM " . OW_Utility::instance()->get_action_history_table_name() . " A
@@ -1202,6 +1211,7 @@ class OW_Process_Flow {
 				   JOIN {$wpdb->posts} AS posts ON posts.ID = A.post_id
 					LEFT OUTER JOIN {$wpdb->postmeta} AS postmeta ON postmeta.post_id = A.post_id
 					AND postmeta.meta_key = '_oasis_task_priority'
+					LEFT JOIN (SELECT XX.name, WW.post_id FROM ebdb.wp_postmeta WW LEFT JOIN wp_terms XX ON XX.term_id = WW.meta_value where meta_key = 'rpg-team') AS D ON posts.ID = D.post_id 
 					LEFT JOIN {$wpdb->base_prefix}users AS users ON users.ID = posts.post_author
 					WHERE 1 = 1 AND A.action_status = 'assignment' ";
 
@@ -1355,10 +1365,16 @@ class OW_Process_Flow {
 
       // get post details
       if ( $post_type === "all" ) {
-         $sql = "SELECT posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date FROM " . $wpdb->posts . " as posts WHERE ID IN (" . implode( $assign_post_ids, "," ) . ") ORDER BY ID DESC";
-         $submited_posts = $wpdb->get_results( $sql );
+         $sql = "SELECT posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date, G.name as team FROM " . $wpdb->posts . " as posts LEFT JOIN (SELECT XX.name, WW.post_id FROM ebdb.wp_postmeta WW LEFT JOIN wp_terms XX ON XX.term_id = WW.meta_value where meta_key = 'rpg-team') AS G
+                    ON posts.ID = G.post_id "
+					. OW_Utility::instance()->get_team_filter('posts','C','ID') .
+					"WHERE posts.ID IN (" . implode( $assign_post_ids, "," ) . ") ORDER BY posts.ID DESC";
+		 $submited_posts = $wpdb->get_results( $sql );
       } else {
-         $sql = "SELECT posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date FROM " . $wpdb->posts . " as posts WHERE post_type = %s AND ID IN (" . implode( $assign_post_ids, "," ) . ") ORDER BY ID DESC";
+         $sql = "SELECT posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date, G.name as team FROM " . $wpdb->posts . " as posts LEFT JOIN (SELECT XX.name, WW.post_id FROM ebdb.wp_postmeta WW LEFT JOIN wp_terms XX ON XX.term_id = WW.meta_value where meta_key = 'rpg-team') AS G
+                    ON posts.ID = G.post_id "
+					. OW_Utility::instance()->get_team_filter('posts','C','ID') .
+					"WHERE post_type = %s AND ID IN (" . implode( $assign_post_ids, "," ) . ") ORDER BY ID DESC";
          $submited_posts = $wpdb->get_results( $wpdb->prepare( $sql, $post_type ) );
       }
 
@@ -1390,19 +1406,21 @@ class OW_Process_Flow {
 
       // get all posts which are not published and are not in workflow
       if ( $post_type === "all" ) {
-         $unsubmitted_posts = $wpdb->get_results( "SELECT distinct posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date FROM {$wpdb->prefix}posts posts
-			WHERE posts.post_status in (" . $auto_submit_stati_list . ")
+         $unsubmitted_posts = $wpdb->get_results( "SELECT distinct posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date FROM {$wpdb->prefix}posts posts"
+			. OW_Utility::instance()->get_team_filter('posts','C','ID') .
+			"WHERE posts.post_status in (" . $auto_submit_stati_list . ")
 			AND
 			(NOT EXISTS (SELECT * from {$wpdb->prefix}postmeta postmeta1 WHERE postmeta1.meta_key = '_oasis_is_in_workflow' and posts.ID = postmeta1.post_id) OR
-			EXISTS (SELECT * from {$wpdb->prefix}postmeta postmeta2 WHERE postmeta2.meta_key = '_oasis_is_in_workflow' AND postmeta2.meta_value = '0' and posts.ID = postmeta2.post_id))
-			order by post_modified_gmt" );
+			EXISTS (SELECT * from {$wpdb->prefix}postmeta postmeta2 WHERE postmeta2.meta_key = '_oasis_is_in_workflow' AND postmeta2.meta_value = '0' and posts.ID = postmeta2.post_id)) 
+			order by posts.post_modified_gmt");
       } else {
-         $sql = "SELECT distinct posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date FROM {$wpdb->prefix}posts posts
-			WHERE post_type = %s AND posts.post_status in (" . $auto_submit_stati_list . ")
+         $sql = "SELECT distinct posts.ID, posts.post_author, posts.post_title, posts.post_type, posts.post_date FROM {$wpdb->prefix}posts posts"
+			. OW_Utility::instance()->get_team_filter('posts','C','ID') .
+			"WHERE post_type = %s AND posts.post_status in (" . $auto_submit_stati_list . ")
 			AND
 			(NOT EXISTS (SELECT * from {$wpdb->prefix}postmeta postmeta1 WHERE postmeta1.meta_key = '_oasis_is_in_workflow' and posts.ID = postmeta1.post_id) OR
 			EXISTS (SELECT * from {$wpdb->prefix}postmeta postmeta2 WHERE postmeta2.meta_key = '_oasis_is_in_workflow' AND postmeta2.meta_value = '0' and posts.ID = postmeta2.post_id))
-			order by post_modified_gmt";
+			order by posts.post_modified_gmt";
 
          $unsubmitted_posts = $wpdb->get_results( $wpdb->prepare( $sql, $post_type ) );
       }
@@ -1560,8 +1578,9 @@ class OW_Process_Flow {
 				  	FROM " . OW_Utility::instance()->get_action_history_table_name() . " AS A
 					LEFT JOIN
 					{$wpdb->posts} AS B
-					ON  A.post_id = B.ID
-					GROUP BY B.post_title";
+					ON  A.post_id = B.ID"
+					. OW_Utility::instance()->get_team_filter('A','C') .
+					"GROUP BY B.post_title";
 
       $result = $wpdb->get_results( $sql );
       return $result;
@@ -1577,7 +1596,7 @@ class OW_Process_Flow {
    public function get_sign_off_date( $action_history_row ) {
       if ( $action_history_row->action_status == "complete" || $action_history_row->action_status == "submitted" ||
               $action_history_row->action_status == "aborted" || $action_history_row->action_status == "abort_no_action" ) {
-         return isset( $action_history_row->create_datetime ) ? $action_history_row->create_datetime :  "";
+         return isset( $action_history_row->create_datetime ) ? $action_history_row->create_datetime :  "&mdash;";
       }
 
       if ( $action_history_row->action_status == "claim_cancel" ) {
@@ -1586,13 +1605,12 @@ class OW_Process_Flow {
          		$action_history_row->step_id,
          		$action_history_row->post_id,
          		$action_history_row->from_id );
-         return isset( $claimed_row->create_datetime ) ? $claimed_row->create_datetime  : "";
+         return isset( $claimed_row->create_datetime ) ? $claimed_row->create_datetime  : "&mdash;";
       }
-
       $ow_history_service = new OW_History_Service();
       $action = $ow_history_service->get_action_history_by_from_id( $action_history_row->ID );
       if ( $action ) {
-         return isset( $action->create_datetime ) ? $action->create_datetime : "";
+         return isset( $action->create_datetime ) ? $action->create_datetime : "&mdash;";
       }
    }
 
@@ -1621,7 +1639,7 @@ class OW_Process_Flow {
       $ow_history_service = new OW_History_Service();
       $next_history_record = $ow_history_service->get_action_history_by_from_id( $action_history_row->ID );
       if ( ! $next_history_record )
-         return ""; // this is the latest step, so this step is not yet completed.
+         return "&mdash;"; // this is the latest step, so this step is not yet completed.
 
       if ( $next_history_record->action_status == "complete" )
          return __( "Workflow completed", "oasisworkflow" );
@@ -1648,6 +1666,9 @@ class OW_Process_Flow {
          return __( "Completed", "oasisworkflow" );
       if ( $process_outcome == "failure" )
          return __( "Unable to Complete", "oasisworkflow" );
+
+		return "&mdash;";
+	
    }
 
    /**

@@ -4,6 +4,15 @@ global $ow_custom_statuses;
 // sanitize the data
 $selected_user = (isset( $_GET['user'] ) && sanitize_text_field( $_GET["user"] )) ? intval( sanitize_text_field( $_GET["user"] ) ) : get_current_user_id();
 $page_number = (isset( $_GET['paged'] ) && sanitize_text_field( $_GET["paged"] )) ? intval( sanitize_text_field( $_GET["paged"] ) ) : 1;
+$die = false;
+
+
+
+
+//ARE ABLE TO SEE USERS INBOX?  NEED TO CHECK THAT REQUESTED USER IS IN THE SAME TEAM
+if(!OW_Utility::instance()->is_in_team(wp_get_current_user()->ID, $selected_user)){
+	$die = true;
+}
 
 $ow_inbox_service = new OW_Inbox_Service();
 $ow_process_flow = new OW_Process_Flow();
@@ -18,10 +27,17 @@ $per_page = OASIS_PER_PAGE;
 $workflow_terminology_options = OW_Utility::instance()->get_custom_workflow_terminology();
 $sign_off_label = $workflow_terminology_options['signOffText'];
 $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
+$display_name = OW_Utility::instance()->get_display_name($selected_user);
+$header = $ow_inbox_service->get_table_header();
 ?>
 <div class="wrap">
     <div id="icon-edit" class="icon32 icon32-posts-post"><br></div>
-    <h1><?php _e( 'Inbox', 'oasisworkflow' ); ?></h1>
+    <h1><?php _e( 'Inbox', 'oasisworkflow' ); if($display_name){echo ' &mdash; '. $display_name; } ?></h1>
+
+	<?php if($die){
+		echo '<p>Unable to display requested inbox</p>';
+	}else{
+	?>
     <div id="workflow-inbox">
         <div class="tablenav top">
 
@@ -58,19 +74,14 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
             </div>
         </div>
         <table class="wp-list-table widefat fixed posts" cellspacing="0" border=0>
-            <thead>
-                <?php $ow_inbox_service->get_table_header(); ?>
-            </thead>
-            <tfoot>
-                <?php $ow_inbox_service->get_table_header(); ?>
-            </tfoot>
+            <thead><?php echo $header; ?></thead>
+            <tfoot><?php echo $header; ?></tfoot>
             <tbody id="coupon-list">
 				<?php
 					$wf_process_status = get_site_option( "oasiswf_status" ) ;
 					$space = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;" ;
 					if( $inbox_items ):
 						$count = 0;
-					   $cat_name = '----';
 						$start = ( $page_number - 1 ) * $per_page;
 						$end = $start + $per_page;
 						foreach ( $inbox_items as $inbox_item ){
@@ -79,8 +90,6 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
 							if ( $count >= $start )
 							{
 								$post = get_post( $inbox_item->post_id );
-
-								$cat_name = OW_Utility::instance()->get_post_categories( $inbox_item->post_id );
 								$user = get_userdata( $post->post_author ) ;
 								$stepId = $inbox_item->step_id;
 								if ( $stepId <= 0 || $stepId == "" ) {
@@ -88,17 +97,13 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
 								}
 								$step = $ow_workflow_service->get_step_by_id( $stepId ) ;
 								$workflow = $ow_workflow_service->get_workflow_by_id( $step->workflow_id );
-
 								$needs_to_be_claimed = $ow_process_flow->check_for_claim( $inbox_item->ID ) ;
-
 								$original_post_id = get_post_meta( $inbox_item->post_id, '_oasis_original', true );
 								/*Check due date and make post item background color in red to notify the admin*/
-                        $ow_email = new OW_Email();
-
-                        $current_date = Date( " F j, Y " );
+		                        $current_date = Date( " F j, Y " );
 								$due_date = OW_Utility::instance()->format_date_for_display( $inbox_item->due_date );
-                        $past_due_date_row_class = '';
-                        $past_due_date_field_class = '';
+								$past_due_date_row_class = '';
+		                        $past_due_date_field_class = '';
 								if( $due_date != "" && strtotime( $due_date ) < strtotime( $current_date ) ) {
    								$past_due_date_row_class = 'past-due-date-row';
    								$past_due_date_field_class = 'past-due-date-field';
@@ -108,13 +113,9 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
                         	class='post-{$inbox_item->post_id} post type-post $past_due_date_row_class
                         	status-pending format-standard hentry category-uncategorized alternate iedit author-other'> " ;
                         $workflow_post_id = esc_attr( $inbox_item->post_id );
-								echo "<th scope='row' class='check-column'>
-									<input type='checkbox' name='post[]' value={$workflow_post_id} wfid='{$inbox_item->ID}'></th>" ;
-
-								echo "<td><strong>" . esc_html( $post->post_title );
-										// TODO : see if we can find a better solution instead of using _post_states
-									_post_states( $post ) ;
-								echo "</strong>" ;
+								echo "<td><strong>" . esc_html( $post->post_title )."</strong><br/><span style='font-size:12px;'>";
+										_post_states( $post );
+								echo "</span>" ;
 								// create the action list
 								if( $needs_to_be_claimed ){ // if the item needs to be claimed, only "Claim" action is visible
 									echo "<div class='row-actions'>
@@ -161,8 +162,16 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
 									get_inline_data( $post );
 								}
 								echo "</td>";
+								echo "<td>".(strlen($inbox_item->team)==0?'&mdash;' :$inbox_item->team)."</td>";
+								echo "<td>" . OW_Utility::instance()->get_user_name( $user->ID ) . "</td>" ;
+								$workflow_name = $workflow->name;
+								if ( ! empty( $workflow->version )) {
+									$workflow_name .= " (" . $workflow->version . ")";
+								}
 
- 								if( get_option( 'oasiswf_priority_setting' ) == 'enable_priority') {
+								echo "<td>{$ow_workflow_service->get_gpid_dbid( $workflow->ID, $stepId, 'lbl' )}<br/><span style='font-size:9px;'>{$workflow_name}</span></td>" ;
+
+								if( get_option( 'oasiswf_priority_setting' ) == 'enable_priority') {
 									//priority settings
 								 	$priority = get_post_meta( $post->ID, '_oasis_task_priority', true );
 								 	if ( empty( $priority ) ) {
@@ -171,22 +180,8 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
 
 								 	$priority_array = OW_Utility::instance()->get_priorities();
 								 	$priority_value = $priority_array[$priority];
-								 	// the CSS is defined without the number part
-									$css_class = substr( $priority, 1 );
-								 	echo "<td ><p class='post-priority $css_class-priority'>". $priority_value ."</p></td>";
+								 	echo "<td>". $priority_value ."</td>";
 								}
-
-								$post_type_obj = get_post_type_object( get_post_type( $inbox_item->post_id ) );
-								echo "<td>{$post_type_obj->labels->singular_name}</td>" ;
-								echo "<td>" . OW_Utility::instance()->get_user_name( $user->ID ) . "</td>" ;
-								$workflow_name = $workflow->name;
-								if ( ! empty( $workflow->version )) {
-									$workflow_name .= " (" . $workflow->version . ")";
-								}
-
-								echo "<td>{$workflow_name} [{$ow_workflow_service->get_gpid_dbid( $workflow->ID, $stepId, 'lbl' )}]</td>" ;
-
-                        echo "<td>{$cat_name}</td>" ;
 
                         $post_status = $ow_custom_statuses->get_single_term_by( 'slug', get_post_status( $post->ID ) );
                         $post_status = is_object( $post_status ) && isset( $post_status->name ) ? $post_status->name : $wf_process_status[$ow_workflow_service->get_gpid_dbid( $workflow->ID, $stepId, 'process' )];
@@ -211,7 +206,7 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
 						echo "<tr>" ;
 						echo "<td class='hurry-td' colspan='8'>
 								<label class='hurray-lbl'>";
-						echo __( "Hurray! No assignments.", "oasisworkflow" );
+						echo __( "No assignments", "oasisworkflow" );
 						echo "</label></td>" ;
 						echo "</tr>" ;
 					endif;
@@ -224,6 +219,7 @@ $abort_workflow_label = $workflow_terminology_options['abortWorkflowText'];
             </div>
         </div>
     </div>
+	<?php } ?>
 </div>
 <span id="wf_edit_inline_content"></span>
 <div id ="step_submit_content"></div>

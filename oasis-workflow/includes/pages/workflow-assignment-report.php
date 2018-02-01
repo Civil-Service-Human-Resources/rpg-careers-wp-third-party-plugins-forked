@@ -11,23 +11,18 @@ $workflow_service = new OW_Workflow_Service();
 $per_page = OASIS_PER_PAGE;
 
 $due_date_title = OW_Utility::instance()->get_custom_workflow_terminology( 'dueDateText' );
+$header = $ow_report_service->get_current_assigment_table_header();
 ?>
 <div class="wrap">
     <form id="assignment_report_form" method="post" action="<?php echo admin_url( 'admin.php?page=oasiswf-reports&tab=userAssignments' ); ?>">
         <div class="tablenav">
             <ul class="subsubsub"></ul>
-            <div class="tablenav-pages">
-<?php OW_Utility::instance()->get_page_link( $count_posts, $page_number, $per_page ); ?>
-            </div>
+            <div class="tablenav-pages"><?php OW_Utility::instance()->get_page_link( $count_posts, $page_number, $per_page ); ?></div>
         </div>
     </form>
     <table class="wp-list-table widefat fixed posts" cellspacing="0" border=0>
-         <thead>
-			<?php $ow_report_service->get_current_assigment_table_header(); ?>
-		  </thead>
-         <tfoot>
-			<?php $ow_report_service->get_current_assigment_table_header(); ?>
-         </tfoot>
+		<thead><?php echo $header; ?></thead>
+        <tfoot><?php echo $header; ?></tfoot>
         <tbody id="coupon-list">
             <?php
             $wf_status = get_site_option( "oasiswf_status" );
@@ -47,7 +42,13 @@ $due_date_title = OW_Utility::instance()->get_custom_workflow_terminology( 'dueD
                      }
 
                      echo "<tr id='post-{$assigned_task->post_id}' class='post-{$assigned_task->post_id} post type-post status-pending format-standard hentry category-uncategorized alternate iedit author-other'> ";
-                     $assigned_actor_id = null;
+                     echo "<td><a href='post.php?post=" . $post->ID . "&action=edit'>{$post->post_title}</a></td>";
+                     $workflow_name = $assigned_task->wf_name;
+					 if(!empty( $assigned_task->wf_version)) {
+                         $workflow_name .= " (v" . $assigned_task->wf_version . ")";
+                     }
+					 echo "<td>".(strlen($assigned_task->team)==0?'&mdash;' :$assigned_task->team)."</td>"; 
+					 $assigned_actor_id = null;
                      if ( $assigned_task->assign_actor_id != -1 ) { // not in review process
                         $assigned_actor = OW_Utility::instance()->get_user_name( $assigned_task->assign_actor_id );
                      } else { //in review process
@@ -55,14 +56,7 @@ $due_date_title = OW_Utility::instance()->get_custom_workflow_terminology( 'dueD
                      }
 
                      echo "<td>" . $assigned_actor . "</td>";
-                     echo "<td><a href='post.php?post=" . $post->ID . "&action=edit'>{$post->post_title}</a></td>";
-                    $workflow_name = "<a href='admin.php?page=oasiswf-admin&wf_id=" . $assigned_task->workflow_id . "'><strong>" . $assigned_task->wf_name;
-                      if( ! empty( $assigned_task->wf_version ) ) {
-                         $workflow_name .= " (" . $assigned_task->wf_version . ")";
-                      }
-                      $workflow_name .= "</strong></a>";
-                                             
-   						echo "<td>{$workflow_name} <br> [{$workflow_service->get_step_name( $assigned_task )}] </td>" ;
+					 echo "<td>{$workflow_service->get_step_name( $assigned_task )}<br/><span style='font-size:9px;'>{$workflow_name}</span></td>"; 
                      echo "<td>" . $wf_status[$workflow_service->get_gpid_dbid( $assigned_task->workflow_id, $step_id, 'process' )] . "</td>" ;
                      echo "<td>" . OW_Utility::instance()->format_date_for_display( $assigned_task->due_date ) . "</td>";
                      echo "</tr>";
@@ -81,8 +75,6 @@ $due_date_title = OW_Utility::instance()->get_custom_workflow_terminology( 'dueD
         </tbody>
     </table>
     <div class="tablenav">
-        <div class="tablenav-pages">
-            <?php OW_Utility::instance()->get_page_link( $count_posts, $page_number, $per_page ); ?>
-        </div>
+        <div class="tablenav-pages"><?php OW_Utility::instance()->get_page_link( $count_posts, $page_number, $per_page ); ?></div>
     </div>
 </div>
